@@ -64,7 +64,30 @@ async def inference_loop(ctx: DevicePipelineContext) -> None:
         except asyncio.CancelledError:
             break
 
-        # 从热缓存读取 confidence
+        # 若热缓存已被 invalidate_settings_cache 清空，则从 DB 重载
+        if not ctx.settings_cache:
+            from sqlalchemy import select
+            from database import AsyncSessionLocal
+            from models import DeviceSettings
+            try:
+                async with AsyncSessionLocal() as db_session:
+                    res = await db_session.execute(
+                        select(DeviceSettings).where(DeviceSettings.device_id == ctx.device_id)
+                    )
+                    ds = res.scalar_one_or_none()
+                    if ds:
+                        ctx.settings_cache = {
+                            "line_y": ds.line_y,
+                            "confidence": ds.confidence,
+                            "fps_limit": ds.fps_limit,
+                            "alert_l2_threshold": ds.alert_l2_threshold,
+                            "alert_l3_threshold": ds.alert_l3_threshold,
+                            "alert_l4_threshold": ds.alert_l4_threshold,
+                            "park_timeout_seconds": ds.park_timeout_seconds,
+                        }
+            except Exception as exc:
+                logger.warning(f"[InferenceLoop] reload settings cache failed: {exc}")
+
         confidence = ctx.settings_cache.get("confidence", 0.5)
 
         try:

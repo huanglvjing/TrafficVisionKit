@@ -180,4 +180,9 @@ async def update_device_settings(
     ))
     await session.commit()
     await session.refresh(settings)
+
+    # 使设备配置热缓存失效，下一帧推理时自动从 DB 重载（运行时立即生效）
+    from pipeline.manager import pipeline_manager
+    pipeline_manager.invalidate_settings_cache(device_id)
+
     return DeviceSettingsResponse.model_validate(settings)

@@ -116,6 +116,10 @@ class TCPServer:
         if self._pipeline_manager:
             await self._pipeline_manager.on_device_connected(device_id, remote_ip)
 
+        # 设备上线：解除 device_offline 预警
+        from services.alert_resolver import alert_resolver
+        await alert_resolver.on_device_online(device_id)
+
         ctx = self._pipeline_manager.get_context(device_id) if self._pipeline_manager else None
 
         try:
@@ -178,4 +182,9 @@ class TCPServer:
             await self._save_session(device_id, connected_at, frames_received, disconnect_reason)
             if self._pipeline_manager:
                 await self._pipeline_manager.on_device_disconnected(device_id)
+            # 设备离线：触发 device_offline 预警，广播 WS 离线通知
+            from services.alert_resolver import alert_resolver
+            from services.websocket_manager import ws_manager
+            await alert_resolver.on_device_offline(device_id)
+            await ws_manager.push_device_offline(device_id, disconnect_reason)
             logger.info(f"[TCPServer] device {device_id} disconnected ({disconnect_reason})")
