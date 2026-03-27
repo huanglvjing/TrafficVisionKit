@@ -6,9 +6,9 @@
 - invalidate_settings_cache → 清除配置热缓存（PUT settings 后调用）
 - get_context → 供 TCP Server 读取 raw_queue
 
-Phase 3 仅含 inference_loop 和 dispatch_loop。
-Phase 6 会加入 ws_push_loop。
-Phase 5 会加入 db_write_loop。
+Phase 3：inference_loop + dispatch_loop（noop 占位 ws/db）。
+Phase 5：db_write_loop 替换 db noop。
+Phase 6：ws_push_loop 替换 ws noop。
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from database import AsyncSessionLocal
 from inference.engine import engine
 from models import DeviceSettings
 from pipeline.context import DevicePipelineContext
+from pipeline.db_write_loop import db_write_loop
 from pipeline.dispatch_loop import dispatch_loop
 from pipeline.inference_loop import inference_loop
 
@@ -76,12 +77,13 @@ class PipelineManager:
         ctx.dispatch_task = asyncio.create_task(
             dispatch_loop(ctx), name=f"dispatch_{device_id}"
         )
-        # ws_task 和 db_task 在 Phase 5/6 填充，暂时用占位协程
+        # db_task：Phase 5 接入 db_write_loop
+        ctx.db_task = asyncio.create_task(
+            db_write_loop(ctx), name=f"db_{device_id}"
+        )
+        # ws_task：Phase 6 替换为 ws_push_loop，暂时用占位协程
         ctx.ws_task = asyncio.create_task(
             _noop_loop(), name=f"ws_{device_id}"
-        )
-        ctx.db_task = asyncio.create_task(
-            _noop_loop(), name=f"db_{device_id}"
         )
 
         self._contexts[device_id] = ctx
@@ -114,7 +116,7 @@ class PipelineManager:
 
 
 async def _noop_loop() -> None:
-    """占位协程，Phase 5/6 替换为实际的 db_write_loop 和 ws_push_loop。"""
+    """占位协程，Phase 6 替换为 ws_push_loop。"""
     try:
         while True:
             await asyncio.sleep(3600)

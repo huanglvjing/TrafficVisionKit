@@ -1,4 +1,5 @@
-"""FastAPI 应用入口（Phase 3：TCP Server + Pipeline 已整合到 lifespan）。"""
+"""FastAPI 应用入口（Phase 5：新增数据聚合 + 清理定时任务）。"""
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,8 @@ from routers import (
     users_router,
     ws_router,
 )
+from services.aggregator import aggregator
+from services import cleanup
 from tcp.server import TCPServer
 
 logger = logging.getLogger(__name__)
@@ -28,7 +31,7 @@ _tcp_server.set_pipeline_manager(pipeline_manager)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：启动时加载模型 + 启动 TCP Server，关闭时优雅退出。"""
+    """应用生命周期：启动时加载模型 + 启动所有后台任务，关闭时优雅退出。"""
     # 1. 加载 YOLO 推理引擎（耗时操作，只做一次）
     logger.info("[Startup] initializing YOLO inference engine ...")
     engine.initialize(
@@ -43,12 +46,30 @@ async def lifespan(app: FastAPI):
     # 2. 启动 TCP Server
     await _tcp_server.start()
 
+    # 3. 启动数据聚合定时协程（60s/3600s 写 traffic_records + hourly_statistics）
+    aggregator.run()
+    logger.info("[Startup] aggregator started")
+
+    # 4. 启动每日数据清理定时协程（凌晨 3:00 批量清理过期数据）
+    _cleanup_task = cleanup.start()
+    logger.info("[Startup] cleanup task started")
+
     yield  # ← 应用正常运行期间
 
-    # 3. 关闭所有 Pipeline（取消协程 Task）
+    # 5. 关闭所有 Pipeline（取消推理/分发/DB/WS 协程 Task）
     await pipeline_manager.shutdown()
 
-    # 4. 停止 TCP Server
+    # 6. 停止数据聚合协程
+    await aggregator.stop()
+
+    # 7. 停止清理协程
+    _cleanup_task.cancel()
+    try:
+        await _cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    # 8. 停止 TCP Server
     await _tcp_server.stop()
 
     logger.info("[Shutdown] done")
@@ -57,7 +78,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="车辆检测与计数系统",
     description="STM32 采集 → TCP 传输 → YOLO 推理 → WebSocket 推送",
-    version="0.3.0",
+    version="0.4.0",
     lifespan=lifespan,
 )
 
@@ -83,7 +104,7 @@ async def health_check():
     """快速健康检查（无需鉴权）。"""
     return {
         "status": "ok",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "yolo_ready": engine.ready,
         "active_devices": len(pipeline_manager.get_all_contexts()),
     }

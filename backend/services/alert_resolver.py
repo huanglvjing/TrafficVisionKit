@@ -166,6 +166,38 @@ class AlertResolver:
         if active_id:
             await self._resolve_alert(active_id, device_id, "device_offline", "auto")
 
+    async def check_flow_spike(
+        self, device_id: int, passed_count: int, avg_per_min: float
+    ) -> None:
+        """流量突增检测（每 60s 聚合后由 aggregator 调用，见设计稿 9.1 节）。
+
+        Args:
+            device_id:   设备 ID
+            passed_count: 本分钟实际过线车辆总数
+            avg_per_min:  历史同期每分钟均值（已由 aggregator 从 hourly_statistics 计算）
+        触发条件：passed_count > avg_per_min × 3
+        解除条件：passed_count < avg_per_min × 1.5
+        """
+        if avg_per_min <= 0:
+            return
+
+        if passed_count > avg_per_min * 3.0:
+            await self._trigger_alert(
+                device_id=device_id,
+                alert_type="flow_spike",
+                level=3,
+                message=(
+                    f"设备 {device_id} 本分钟过线车辆数 {passed_count} 辆，"
+                    f"超过历史同期均值 {avg_per_min:.1f}/min 的 300%"
+                ),
+                vehicle_count=passed_count,
+            )
+        else:
+            # 检查是否需要解除已有 flow_spike 预警
+            active_id = self._active.get(device_id, {}).get("flow_spike")
+            if active_id and passed_count < avg_per_min * 1.5:
+                await self._resolve_alert(active_id, device_id, "flow_spike", "auto")
+
     # ── 内部实现 ─────────────────────────────────────────────────────────────────
 
     async def _trigger_congestion(
