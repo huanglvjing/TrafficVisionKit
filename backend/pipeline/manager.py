@@ -8,7 +8,7 @@
 
 Phase 3：inference_loop + dispatch_loop（noop 占位 ws/db）。
 Phase 5：db_write_loop 替换 db noop。
-Phase 6：ws_push_loop 替换 ws noop。
+Phase 6：ws_push_loop 替换 ws noop（本阶段完整 4 协程）。
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ from pipeline.context import DevicePipelineContext
 from pipeline.db_write_loop import db_write_loop
 from pipeline.dispatch_loop import dispatch_loop
 from pipeline.inference_loop import inference_loop
+from pipeline.ws_push_loop import ws_push_loop
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ class PipelineManager:
         # 预加载配置热缓存
         ctx.settings_cache = await self._load_settings_cache(device_id)
 
-        # 启动 4 个协程 Task（Phase 5/6 补充 db_write_loop 和 ws_push_loop）
+        # 启动 4 个协程 Task
         ctx.inference_task = asyncio.create_task(
             inference_loop(ctx), name=f"inference_{device_id}"
         )
@@ -81,9 +82,9 @@ class PipelineManager:
         ctx.db_task = asyncio.create_task(
             db_write_loop(ctx), name=f"db_{device_id}"
         )
-        # ws_task：Phase 6 替换为 ws_push_loop，暂时用占位协程
+        # ws_task：Phase 6 接入 ws_push_loop
         ctx.ws_task = asyncio.create_task(
-            _noop_loop(), name=f"ws_{device_id}"
+            ws_push_loop(ctx), name=f"ws_{device_id}"
         )
 
         self._contexts[device_id] = ctx
@@ -113,15 +114,6 @@ class PipelineManager:
         for device_id in device_ids:
             await self.on_device_disconnected(device_id)
         logger.info("[PipelineManager] all pipelines stopped")
-
-
-async def _noop_loop() -> None:
-    """占位协程，Phase 6 替换为 ws_push_loop。"""
-    try:
-        while True:
-            await asyncio.sleep(3600)
-    except asyncio.CancelledError:
-        pass
 
 
 # 全局单例

@@ -171,6 +171,15 @@ class Aggregator:
                 )
                 continue
 
+            # 重置本分钟丢帧统计（设计稿：dropped_frames 为"本分钟累计"）
+            try:
+                from pipeline.manager import pipeline_manager
+                ctx = pipeline_manager.get_context(device_id)
+                if ctx:
+                    ctx.stats.dropped_frames = 0
+            except Exception:
+                pass
+
             # flow_spike 检测（写库成功后再检测，使用当前分钟数据）
             await self._check_flow_spike(device_id, passed_count, recorded_at.hour)
 
