@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { ProtectedRoute, AdminRoute } from '@/routes/index'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
+import History from '@/pages/History'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,7 +41,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route index element={<Dashboard />} />
-              <Route path="history" element={<PlaceholderPage title="历史数据" />} />
+              <Route path="history" element={<History />} />
               <Route path="settings" element={<PlaceholderPage title="系统设置" />} />
 
               {/* 需要管理员 */}

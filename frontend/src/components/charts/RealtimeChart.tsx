@@ -31,6 +31,8 @@ interface RealtimeChartProps {
   height?: number
   yDomain?: [number | 'auto', number | 'auto']
   title?: string
+  /** 自定义 X 轴标签格式化，默认 "mm:ss"（实时），历史数据传 "MM/DD HH:mm" 格式函数 */
+  xFormatter?: (time: string) => string
 }
 
 function formatTime(iso: string): string {
@@ -48,6 +50,7 @@ export function RealtimeChart({
   height = 120,
   yDomain = [0, 'auto'],
   title,
+  xFormatter,
 }: RealtimeChartProps) {
   const visible = data.slice(-60)
 
@@ -76,7 +79,7 @@ export function RealtimeChart({
 
           <XAxis
             dataKey="time"
-            tickFormatter={formatTime}
+            tickFormatter={xFormatter ?? formatTime}
             interval={9}
             tick={{ fill: '#7A90B3', fontSize: 9 }}
             axisLine={false}
