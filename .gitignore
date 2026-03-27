@@ -1,0 +1,43 @@
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+backend/venv/
+backend/.env
+backend/*.egg-info/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/dist/
+backend/build/
+
+# ── Node / pnpm ───────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.production.local
+frontend/.env.development.local
+
+# ── 环境变量（含密钥，绝不提交！）────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ── IDE / OS ──────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ── YOLO 模型文件（体积大，单独管理）─────────────────────────
+backend/models/*.pt
+backend/models/*.onnx
+
+# ── 日志 ─────────────────────────────────────────────────────
+*.log
+logs/

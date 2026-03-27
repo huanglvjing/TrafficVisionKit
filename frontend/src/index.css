@@ -1,0 +1,173 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ── 字体 ── */
+@import "@fontsource/geist/400.css";
+@import "@fontsource/geist/500.css";
+@import "@fontsource/geist/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/orbitron/700.css";
+@import "@fontsource/orbitron/900.css";
+
+/* ============================================================
+   HUD 主题 CSS 变量（工业监控风格，见设计稿 16.1 节）
+   所有颜色只在这一处定义，业务代码禁止内联硬编码颜色值
+   ============================================================ */
+:root {
+  /* 背景层级 */
+  --bg-base:              #0A0E1A;
+  --bg-panel:             #0F1628;
+  --bg-surface:           #162040;
+
+  /* 主强调色 */
+  --color-accent:         #00D4FF;
+
+  /* 文字 */
+  --color-text-primary:   #E8F0FF;
+  --color-text-secondary: #7A90B3;
+
+  /* 预警等级 */
+  --color-alert-l1:       #4FC3F7;
+  --color-alert-l2:       #FFD600;
+  --color-alert-l3:       #FF9800;
+  --color-alert-l4:       #F44336;
+  --color-alert-l5:       #FF3B5C;
+
+  /* 设备状态 */
+  --color-online:         #00E676;
+  --color-offline:        #FF5252;
+
+  /* 字体族 */
+  --font-sans:    'Geist', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Orbitron', sans-serif;
+
+  /* ── shadcn/ui 系统变量（映射到 HUD 配色）─────────────── */
+  --background:            var(--bg-base);
+  --foreground:            var(--color-text-primary);
+  --card:                  var(--bg-panel);
+  --card-foreground:       var(--color-text-primary);
+  --popover:               var(--bg-surface);
+  --popover-foreground:    var(--color-text-primary);
+  --primary:               var(--color-accent);
+  --primary-foreground:    var(--bg-base);
+  --secondary:             var(--bg-surface);
+  --secondary-foreground:  var(--color-text-primary);
+  --muted:                 var(--bg-panel);
+  --muted-foreground:      var(--color-text-secondary);
+  --accent:                var(--bg-surface);
+  --accent-foreground:     var(--color-accent);
+  --destructive:           var(--color-alert-l4);
+  --border:                #1E2D4A;
+  --input:                 #1E2D4A;
+  --ring:                  var(--color-accent);
+  --radius:                0.375rem;
+
+  /* shadcn sidebar */
+  --sidebar:               var(--bg-panel);
+  --sidebar-foreground:    var(--color-text-primary);
+  --sidebar-primary:       var(--color-accent);
+  --sidebar-primary-foreground: var(--bg-base);
+  --sidebar-accent:        var(--bg-surface);
+  --sidebar-accent-foreground: var(--color-text-primary);
+  --sidebar-border:        #1E2D4A;
+  --sidebar-ring:          var(--color-accent);
+}
+
+/* ============================================================
+   Tailwind v4 @theme — 将变量映射为 utility class
+   ============================================================ */
+@theme inline {
+  /* HUD 专属 */
+  --color-accent:             var(--color-accent);
+  --color-bg-base:            var(--bg-base);
+  --color-bg-panel:           var(--bg-panel);
+  --color-bg-surface:         var(--bg-surface);
+  --color-text-primary:       var(--color-text-primary);
+  --color-text-secondary:     var(--color-text-secondary);
+  --color-alert-l1:           var(--color-alert-l1);
+  --color-alert-l2:           var(--color-alert-l2);
+  --color-alert-l3:           var(--color-alert-l3);
+  --color-alert-l4:           var(--color-alert-l4);
+  --color-alert-l5:           var(--color-alert-l5);
+  --color-online:             var(--color-online);
+  --color-offline:            var(--color-offline);
+
+  /* shadcn 颜色系统 */
+  --color-background:         var(--background);
+  --color-foreground:         var(--foreground);
+  --color-card:               var(--card);
+  --color-card-foreground:    var(--card-foreground);
+  --color-popover:            var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary:            var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary:          var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:              var(--muted);
+  --color-muted-foreground:   var(--muted-foreground);
+  --color-accent-foreground:  var(--accent-foreground);
+  --color-destructive:        var(--destructive);
+  --color-border:             var(--border);
+  --color-input:              var(--input);
+  --color-ring:               var(--ring);
+  --color-sidebar:            var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary:    var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent:     var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border:     var(--sidebar-border);
+  --color-sidebar-ring:       var(--sidebar-ring);
+
+  /* 字体 */
+  --font-family-sans:         var(--font-sans);
+  --font-family-mono:         var(--font-mono);
+  --font-family-display:      var(--font-display);
+
+  /* 圆角 */
+  --radius-sm:  calc(var(--radius) * 0.6);
+  --radius-md:  calc(var(--radius) * 0.8);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) * 1.4);
+}
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   全局基础样式
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-base);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* 页面底层 HUD 网格（40px 间隔） */
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+}
