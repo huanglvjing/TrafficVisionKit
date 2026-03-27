@@ -64,7 +64,7 @@ export function useStreamSocket(deviceId: number): UseStreamSocketReturn {
       switch (msg.type) {
         case 'stream_frame': {
           const m = msg as StreamFrameMsg
-          updateFrame(m.frame.data)
+          updateFrame(m.frame.data, m.frame.width, m.frame.height)
           updateDetection(m.detection)
           break
         }

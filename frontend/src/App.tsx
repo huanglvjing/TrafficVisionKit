@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ProtectedRoute, AdminRoute } from '@/routes/index'
 import Login from '@/pages/Login'
+import Dashboard from '@/pages/Dashboard'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,7 +14,7 @@ const queryClient = new QueryClient({
   },
 })
 
-// ── 占位页面（Phase 8-10 会替换） ─────────────────────────────────────────────
+// ── 占位页面（Phase 9-10 会替换） ─────────────────────────────────────────────
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -38,7 +39,7 @@ export default function App() {
           {/* 需要登录 */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route index element={<PlaceholderPage title="实时监控" />} />
+              <Route index element={<Dashboard />} />
               <Route path="history" element={<PlaceholderPage title="历史数据" />} />
               <Route path="settings" element={<PlaceholderPage title="系统设置" />} />
 
