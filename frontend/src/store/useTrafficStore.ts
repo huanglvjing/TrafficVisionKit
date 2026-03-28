@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { AlertItem, TimeSeriesPoint } from '@/types/models'
-import type { DetectionData } from '@/types/websocket'
+import type { DetectionData, VehicleDetection } from '@/types/websocket'
 
 const DEFAULT_DEVICE_ID =
   Number(import.meta.env['VITE_DEFAULT_DEVICE_ID'] ?? '1') || 1
@@ -23,6 +23,8 @@ interface TrafficState {
   alertLevel: number
   lineY: number
   inferenceMs: number
+  // 当前帧所有检测到的车辆（供前端 Canvas 绘制 HUD 检测框）
+  vehicles: VehicleDetection[]
   // 活跃预警列表
   activeAlerts: AlertItem[]
   // 近 60 秒实时车辆数折线图数据（每秒 1 点）
@@ -62,6 +64,7 @@ const initialDeviceState = {
   alertLevel: 0,
   lineY: 240,
   inferenceMs: 0,
+  vehicles: [] as VehicleDetection[],
   activeAlerts: [] as AlertItem[],
   realtimeHistory: [] as TimeSeriesPoint[],
   isDeviceOnline: false,
@@ -93,6 +96,7 @@ function buildDetectionFields(
     alertLevel: data.alert_level,
     lineY: data.line_y,
     inferenceMs: data.inference_ms,
+    vehicles: data.vehicles ?? [],
     realtimeHistory,
     isDeviceOnline: true,
   }

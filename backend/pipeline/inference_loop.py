@@ -34,11 +34,11 @@ def _run_inference(jpeg_bytes: bytes, ctx: DevicePipelineContext, confidence: fl
     if frame is None:
         return {}
 
-    # YOLO 推理 + ByteTrack 跟踪
-    results, rendered = engine.detect(frame, {}, confidence)
+    # YOLO 推理 + ByteTrack 跟踪（rendered 丢弃，由前端 Canvas 绘制 HUD 检测框）
+    results, _ = engine.detect(frame, {}, confidence)
 
-    # 编码渲染帧为 base64 JPEG
-    _, enc = cv2.imencode(".jpg", rendered, [cv2.IMWRITE_JPEG_QUALITY, 80])
+    # 编码原始帧（无 OpenCV 标注），前端负责高科技可视化
+    _, enc = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
     frame_b64 = base64.b64encode(enc.tobytes()).decode("ascii")
 
     elapsed_ms = (time.perf_counter() - t0) * 1000

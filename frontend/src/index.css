@@ -171,3 +171,82 @@ body {
     @apply border-border outline-ring/50;
   }
 }
+
+/* ============================================================
+   HUD 动画关键帧
+   ============================================================ */
+
+/* 视频扫描线 — 从上到下扫过 */
+@keyframes hud-scan-line {
+  0%   { top: -1%;  opacity: 0; }
+  3%   { opacity: 0.7; }
+  97%  { opacity: 0.35; }
+  100% { top: 101%; opacity: 0; }
+}
+
+/* LIVE 指示灯闪烁 */
+@keyframes live-dot {
+  0%, 100% { opacity: 1;   transform: scale(1);   }
+  50%       { opacity: 0.2; transform: scale(0.75); }
+}
+
+/* 环形涟漪扩散 */
+@keyframes ring-expand {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0;   }
+}
+
+/* 面板角标呼吸 */
+@keyframes corner-breath {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 1;    }
+}
+
+/* 数字值更新高亮闪 */
+@keyframes value-flash {
+  0%   { color: #ffffff; text-shadow: 0 0 16px #00D4FF; }
+  100% { color: inherit; text-shadow: none; }
+}
+
+/* 垂直方向粒子上浮 */
+@keyframes particle-up {
+  0%   { transform: translateY(0);    opacity: 0.8; }
+  100% { transform: translateY(-48px); opacity: 0;   }
+}
+
+/* 状态点 ping */
+@keyframes status-ping {
+  0%   { transform: scale(1); opacity: 0.75; }
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+/* 横向进度条从左生长 */
+@keyframes bar-grow {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+
+/* 文字极轻微抖动 (sci-fi glitch) */
+@keyframes text-glitch {
+  0%, 90%, 100% { transform: translate(0); opacity: 1; }
+  92%           { transform: translate(-1px, 1px); opacity: 0.8; }
+  94%           { transform: translate(1px, -1px); opacity: 1; }
+  96%           { transform: translate(0, 1px);   opacity: 0.9; }
+}
+
+/* 离线遮罩噪点闪烁 */
+@keyframes noise-flicker {
+  0%, 100% { opacity: 0.04; }
+  50%       { opacity: 0.08; }
+}
+
+/* 仪表扇形背景轻微旋转（装饰） */
+@keyframes slow-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* 虚线边框流动 */
+@keyframes dash-flow {
+  to { stroke-dashoffset: -20; }
+}
