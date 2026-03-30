@@ -42,7 +42,7 @@ class PipelineManager:
         return list(self._contexts.values())
 
     async def _load_settings_cache(self, device_id: int) -> dict:
-        """从数据库加载设备配置到热缓存字典。"""
+        """从数据库加载设备配置到热缓存字典（含速度标定、逆行、ROI 等新字段）。"""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(DeviceSettings).where(DeviceSettings.device_id == device_id)
@@ -51,13 +51,23 @@ class PipelineManager:
             if settings is None:
                 return {}
             return {
-                "line_y": settings.line_y,
-                "confidence": settings.confidence,
-                "fps_limit": settings.fps_limit,
-                "alert_l2_threshold": settings.alert_l2_threshold,
-                "alert_l3_threshold": settings.alert_l3_threshold,
-                "alert_l4_threshold": settings.alert_l4_threshold,
-                "park_timeout_seconds": settings.park_timeout_seconds,
+                # 基础推理参数
+                "line_y":                   settings.line_y,
+                "confidence":               settings.confidence,
+                "fps_limit":                settings.fps_limit,
+                "alert_l2_threshold":       settings.alert_l2_threshold,
+                "alert_l3_threshold":       settings.alert_l3_threshold,
+                "alert_l4_threshold":       settings.alert_l4_threshold,
+                "park_timeout_seconds":     settings.park_timeout_seconds,
+                # 速度估算 & 逆行检测
+                "calibration_px_per_meter": settings.calibration_px_per_meter,
+                "speed_limit_kmh":          settings.speed_limit_kmh,
+                "allowed_direction":        settings.allowed_direction,
+                # ROI 区域
+                "roi_x1": settings.roi_x1,
+                "roi_y1": settings.roi_y1,
+                "roi_x2": settings.roi_x2,
+                "roi_y2": settings.roi_y2,
             }
 
     async def on_device_connected(self, device_id: int, device_ip: str) -> None:
@@ -98,15 +108,17 @@ class PipelineManager:
         await ctx.cancel_all_tasks()
         logger.info(f"[PipelineManager] device {device_id} pipeline stopped")
 
-    def invalidate_settings_cache(self, device_id: int) -> None:
-        """清除设备配置热缓存，下一帧读取前会重新从 DB 加载。
-        
-        注意：此方法是同步的，由 PUT /devices/{id}/settings 路由同步调用。
-        热缓存在 TCP 帧处理时才会按需重载（懒加载），所以此处只需清空。
+    async def reload_settings_cache(self, device_id: int) -> None:
+        """从数据库重新加载配置热缓存（PUT settings 后调用，立即生效）。
+
+        原来的 invalidate_settings_cache 只清空 dict，没有重载逻辑，
+        导致新字段（calibration_px_per_meter 等）永远读不到。
+        现在改为直接异步重载，路由层 await 此方法即可。
         """
         ctx = self._contexts.get(device_id)
         if ctx:
-            ctx.settings_cache.clear()
+            ctx.settings_cache = await self._load_settings_cache(device_id)
+            logger.info(f"[PipelineManager] device {device_id} settings_cache reloaded")
 
     async def shutdown(self) -> None:
         """关闭所有 Pipeline（服务关闭时调用）。"""

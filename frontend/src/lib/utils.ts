@@ -60,14 +60,29 @@ export function alertLevelLabel(level: number): string {
   return labels[Math.max(0, Math.min(level, 5))] ?? '正常'
 }
 
+/**
+ * 预警等级 → Hex 颜色（用于 Canvas / boxShadow / 带透明度场景）
+ * 0=accent青色, 1~5=黄→橙→红
+ */
+export function alertLevelHex(level: number): string {
+  const MAP = ['#00D4FF', '#4FC3F7', '#FFD600', '#FF9800', '#F44336', '#FF3B5C']
+  return MAP[Math.min(Math.max(level, 0), 5)]
+}
+
 /** 预警类型 → 中文名称 */
 export function alertTypeLabel(alertType: string): string {
+  // 带 tracking_id 后缀的类型（如 abnormal_stop_12）取前缀匹配
+  const key = alertType.replace(/_\d+$/, '')
   const map: Record<string, string> = {
-    congestion: '交通拥堵',
+    congestion:    '交通拥堵',
     abnormal_stop: '异常停车',
-    flow_spike: '流量突增',
-    flow_zero: '零流量',
-    device_offline: '设备离线',
+    flow_spike:    '流量突增',
+    flow_zero:     '零流量',
+    device_offline:'设备离线',
+    speeding:      '超速预警',
+    wrong_way:     '逆行预警',
+    dense_flow:    '密集车流',
+    queue_detected:'排队检测',
   }
-  return map[alertType] ?? alertType
+  return map[key] ?? alertType
 }

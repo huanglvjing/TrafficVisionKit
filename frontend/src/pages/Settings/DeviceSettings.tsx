@@ -12,7 +12,18 @@ import { HudPanel } from '@/components/ui/HudPanel'
 import { HudCorners } from '@/components/video/HudCorners'
 import type { DeviceSettingsUpdate } from '@/types/api'
 
-type FormState = Required<DeviceSettingsUpdate>
+interface FormState {
+  line_y: number
+  confidence: number
+  fps_limit: number
+  alert_l2_threshold: number
+  alert_l3_threshold: number
+  alert_l4_threshold: number
+  park_timeout_seconds: number
+  calibration_px_per_meter: number | null
+  speed_limit_kmh: number
+  allowed_direction: 'up' | 'down' | 'both'
+}
 
 const DEFAULT_FORM: FormState = {
   line_y: 240,
@@ -22,6 +33,9 @@ const DEFAULT_FORM: FormState = {
   alert_l3_threshold: 10,
   alert_l4_threshold: 15,
   park_timeout_seconds: 30,
+  calibration_px_per_meter: null,
+  speed_limit_kmh: 60,
+  allowed_direction: 'both',
 }
 
 // ── 子组件 ────────────────────────────────────────────────────────────────────
@@ -100,13 +114,16 @@ export default function DeviceSettings() {
   useEffect(() => {
     if (settings) {
       setForm({
-        line_y: settings.line_y,
-        confidence: settings.confidence,
-        fps_limit: settings.fps_limit,
-        alert_l2_threshold: settings.alert_l2_threshold,
-        alert_l3_threshold: settings.alert_l3_threshold,
-        alert_l4_threshold: settings.alert_l4_threshold,
-        park_timeout_seconds: settings.park_timeout_seconds,
+        line_y:                   settings.line_y,
+        confidence:               settings.confidence,
+        fps_limit:                settings.fps_limit,
+        alert_l2_threshold:       settings.alert_l2_threshold,
+        alert_l3_threshold:       settings.alert_l3_threshold,
+        alert_l4_threshold:       settings.alert_l4_threshold,
+        park_timeout_seconds:     settings.park_timeout_seconds,
+        calibration_px_per_meter: settings.calibration_px_per_meter ?? null,
+        speed_limit_kmh:          settings.speed_limit_kmh,
+        allowed_direction:        settings.allowed_direction,
       })
     }
   }, [settings])
@@ -116,14 +133,32 @@ export default function DeviceSettings() {
   }
 
   const handleSave = () => {
-    save(form, {
+    const payload: DeviceSettingsUpdate = {
+      ...form,
+      // calibration_px_per_meter 为 null 时显式传 null（清除标定）
+      calibration_px_per_meter: form.calibration_px_per_meter,
+    }
+    save(payload, {
       onSuccess: () => showToast(true,  '✓ 配置已生效，推理协程将在下一帧重载'),
       onError:   () => showToast(false, '✗ 保存失败，请检查参数范围'),
     })
   }
 
   const handleReset = () => {
-    if (settings) setForm({ line_y: settings.line_y, confidence: settings.confidence, fps_limit: settings.fps_limit, alert_l2_threshold: settings.alert_l2_threshold, alert_l3_threshold: settings.alert_l3_threshold, alert_l4_threshold: settings.alert_l4_threshold, park_timeout_seconds: settings.park_timeout_seconds })
+    if (settings) {
+      setForm({
+        line_y:                   settings.line_y,
+        confidence:               settings.confidence,
+        fps_limit:                settings.fps_limit,
+        alert_l2_threshold:       settings.alert_l2_threshold,
+        alert_l3_threshold:       settings.alert_l3_threshold,
+        alert_l4_threshold:       settings.alert_l4_threshold,
+        park_timeout_seconds:     settings.park_timeout_seconds,
+        calibration_px_per_meter: settings.calibration_px_per_meter ?? null,
+        speed_limit_kmh:          settings.speed_limit_kmh,
+        allowed_direction:        settings.allowed_direction,
+      })
+    }
   }
 
   const pf = (v: number) => v.toFixed(2)
@@ -263,6 +298,111 @@ export default function DeviceSettings() {
                 </FieldRow>
               </HudPanel>
 
+              {/* 速度估算 & 逆行检测 */}
+              <HudPanel title="速度估算 & 逆行检测">
+                <div>
+                  {/* 相机标定 */}
+                  <FieldRow
+                    label="像素/米 标定"
+                    hint="测量视频内已知距离对应的像素数再相除，例：4m车道=200px → 填50"
+                  >
+                    <div className="flex items-center gap-2">
+                      {form.calibration_px_per_meter !== null ? (
+                        <>
+                          <NumInput
+                            value={form.calibration_px_per_meter}
+                            min={0.1} max={9999} step={0.1}
+                            onChange={(v) => setForm((f) => ({ ...f, calibration_px_per_meter: v }))}
+                          />
+                          <span className="font-display text-[9px] text-text-secondary/40 uppercase">px/m</span>
+                          <button
+                            type="button"
+                            onClick={() => setForm((f) => ({ ...f, calibration_px_per_meter: null }))}
+                            className="rounded-sm px-2 py-1 font-display text-[8px] tracking-[0.12em] uppercase transition-all"
+                            style={{
+                              background: 'rgba(244,67,54,0.08)',
+                              border: '1px solid rgba(244,67,54,0.25)',
+                              color: '#F44336',
+                            }}
+                          >
+                            清除
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span
+                            className="rounded-sm px-2 py-1 font-mono text-[10px]"
+                            style={{
+                              background: 'rgba(255,204,0,0.08)',
+                              border: '1px solid rgba(255,204,0,0.2)',
+                              color: '#ffcc00',
+                            }}
+                          >
+                            未标定（速度功能关闭）
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setForm((f) => ({ ...f, calibration_px_per_meter: 50 }))}
+                            className="rounded-sm px-2 py-1 font-display text-[8px] tracking-[0.12em] uppercase transition-all"
+                            style={{
+                              background: 'rgba(0,212,255,0.08)',
+                              border: '1px solid rgba(0,212,255,0.25)',
+                              color: '#00D4FF',
+                            }}
+                          >
+                            + 设置
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </FieldRow>
+
+                  {/* 速度限制 */}
+                  <FieldRow label="限速值" hint="km/h，用于超速预警">
+                    <div className="flex items-center gap-3">
+                      <NumInput
+                        value={form.speed_limit_kmh} min={5} max={300}
+                        onChange={(v) => setForm((f) => ({ ...f, speed_limit_kmh: v }))}
+                      />
+                      <span className="font-display text-[9px] text-text-secondary/40 uppercase">km/h</span>
+                    </div>
+                  </FieldRow>
+
+                  {/* 允许行驶方向 */}
+                  <FieldRow label="允许行驶方向" hint="用于逆行检测，↑ 为 Y 减小方向">
+                    <div className="flex gap-2">
+                      {([
+                        { val: 'both', label: '双向', hint: '↑↓' },
+                        { val: 'up',   label: '向上', hint: '↑'  },
+                        { val: 'down', label: '向下', hint: '↓'  },
+                      ] as const).map(({ val, label, hint: btnHint }) => {
+                        const active = form.allowed_direction === val
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setForm((f) => ({ ...f, allowed_direction: val }))}
+                            className="flex flex-col items-center rounded-sm px-3 py-1.5 transition-all"
+                            style={{
+                              background: active ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.02)',
+                              border: active
+                                ? '1px solid rgba(0,212,255,0.45)'
+                                : '1px solid rgba(255,255,255,0.07)',
+                              color: active ? '#00D4FF' : 'rgba(122,144,179,0.6)',
+                            }}
+                          >
+                            <span className="font-mono text-base leading-none">{btnHint}</span>
+                            <span className="mt-0.5 font-display text-[7px] tracking-widest uppercase">
+                              {label}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </FieldRow>
+                </div>
+              </HudPanel>
+
             </div>
 
             {/* 右列：预览 + 说明 */}
@@ -339,6 +479,56 @@ export default function DeviceSettings() {
                       停车 {form.park_timeout_seconds}s → 异常停车 L3
                     </span>
                   </div>
+                </div>
+              </HudPanel>
+
+              {/* 速度标定状态卡 */}
+              <HudPanel title="速度功能状态">
+                <div className="space-y-2.5">
+                  {/* 标定状态 */}
+                  <div
+                    className="flex items-center gap-2.5 rounded-sm px-2.5 py-2.5"
+                    style={{
+                      background: form.calibration_px_per_meter !== null
+                        ? 'rgba(52,199,89,0.06)'
+                        : 'rgba(255,204,0,0.06)',
+                      border: form.calibration_px_per_meter !== null
+                        ? '1px solid rgba(52,199,89,0.2)'
+                        : '1px solid rgba(255,204,0,0.2)',
+                    }}
+                  >
+                    <span
+                      className="h-2 w-2 flex-shrink-0 rounded-full"
+                      style={{
+                        background: form.calibration_px_per_meter !== null ? '#34c759' : '#ffcc00',
+                        boxShadow: `0 0 6px ${form.calibration_px_per_meter !== null ? '#34c759' : '#ffcc00'}`,
+                      }}
+                    />
+                    <div className="flex flex-col">
+                      <span
+                        className="font-mono text-[10px] font-bold"
+                        style={{ color: form.calibration_px_per_meter !== null ? '#34c759' : '#ffcc00' }}
+                      >
+                        {form.calibration_px_per_meter !== null
+                          ? `已标定  ${form.calibration_px_per_meter} px/m`
+                          : '未标定（速度功能已禁用）'}
+                      </span>
+                      <span className="font-mono text-[8px] text-text-secondary/45">
+                        {form.calibration_px_per_meter !== null
+                          ? `限速 ${form.speed_limit_kmh} km/h · ${
+                              form.allowed_direction === 'both' ? '双向' :
+                              form.allowed_direction === 'up'   ? '↑ 向上' : '↓ 向下'
+                            }`
+                          : '在左侧"像素/米 标定"中填写数值以开启'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 标定说明 */}
+                  <p className="font-mono text-[8px] leading-relaxed text-text-secondary/40">
+                    标定方法：在视频画面中找一段已知真实长度的参考物（如车道线间距、斑马线宽度），
+                    用截图工具量取其像素长度后除以实际长度（米），即为 px/m 值。
+                  </p>
                 </div>
               </HudPanel>
 

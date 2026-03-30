@@ -179,6 +179,15 @@ export function useUpdateDeviceSettings(id: number) {
   })
 }
 
+export function useUpdateDevice() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { name?: string; location?: string } }) =>
+      apiClient.put<DeviceDetail>(`/api/devices/${id}`, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['devices'] }),
+  })
+}
+
 export function useDeleteDevice() {
   const qc = useQueryClient()
   return useMutation({

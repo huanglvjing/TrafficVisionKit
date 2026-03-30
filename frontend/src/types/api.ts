@@ -76,7 +76,8 @@ export interface DeviceSettingsUpdate {
   alert_l3_threshold?: number
   alert_l4_threshold?: number
   park_timeout_seconds?: number
-  calibration_px_per_meter?: number
+  /** null 表示清除标定（关闭速度估算） */
+  calibration_px_per_meter?: number | null
   speed_limit_kmh?: number
   allowed_direction?: 'up' | 'down' | 'both'
   roi_x1?: number

@@ -6,7 +6,7 @@
  * - 底部：系统状态指示
  */
 import { NavLink } from 'react-router-dom'
-import { Activity, BarChart2, Settings, Users } from 'lucide-react'
+import { Activity, BarChart2, Settings, Users, Monitor } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuthStore } from '@/store/useAuthStore'
 
@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/',        icon: Activity,  label: '实时监控' },
   { to: '/history', icon: BarChart2, label: '历史数据' },
   { to: '/settings',icon: Settings,  label: '系统设置' },
+  { to: '/devices', icon: Monitor,   label: '设备管理', adminOnly: true },
   { to: '/users',   icon: Users,     label: '用户管理', adminOnly: true },
 ]
 

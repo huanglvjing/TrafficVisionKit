@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from sqlalchemy import select
 
 from inference.counter import count_crossings
 from inference.parking_detector import check_parking
@@ -32,6 +33,8 @@ from inference.metrics import (
 )
 from pipeline.context import DevicePipelineContext
 from services.alert_resolver import alert_resolver
+from database import AsyncSessionLocal
+from models import DeviceSettings
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +58,31 @@ async def dispatch_loop(ctx: DevicePipelineContext) -> None:
         results = data.get("results", [])
         inference_ms = data.get("inference_ms", 0.0)
         timestamp = _utcnow_str()
+
+        # 兼容旧缓存：如果关键字段不存在，懒加载一次完整配置（含速度标定字段）
+        if "calibration_px_per_meter" not in ctx.settings_cache:
+            async with AsyncSessionLocal() as session:
+                row = await session.execute(
+                    select(DeviceSettings).where(DeviceSettings.device_id == ctx.device_id)
+                )
+                settings = row.scalar_one_or_none()
+                if settings is not None:
+                    ctx.settings_cache.update({
+                        "line_y": settings.line_y,
+                        "confidence": settings.confidence,
+                        "fps_limit": settings.fps_limit,
+                        "alert_l2_threshold": settings.alert_l2_threshold,
+                        "alert_l3_threshold": settings.alert_l3_threshold,
+                        "alert_l4_threshold": settings.alert_l4_threshold,
+                        "park_timeout_seconds": settings.park_timeout_seconds,
+                        "calibration_px_per_meter": settings.calibration_px_per_meter,
+                        "speed_limit_kmh": settings.speed_limit_kmh,
+                        "allowed_direction": settings.allowed_direction,
+                        "roi_x1": settings.roi_x1,
+                        "roi_y1": settings.roi_y1,
+                        "roi_x2": settings.roi_x2,
+                        "roi_y2": settings.roi_y2,
+                    })
 
         # ── 读取热缓存配置 ────────────────────────────────────────────────────
         line_y        = ctx.settings_cache.get("line_y", 240)

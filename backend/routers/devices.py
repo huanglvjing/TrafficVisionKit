@@ -181,8 +181,8 @@ async def update_device_settings(
     await session.commit()
     await session.refresh(settings)
 
-    # 使设备配置热缓存失效，下一帧推理时自动从 DB 重载（运行时立即生效）
+    # 立即重载配置热缓存，推理协程下一帧即可读到新值（含 calibration_px_per_meter 等）
     from pipeline.manager import pipeline_manager
-    pipeline_manager.invalidate_settings_cache(device_id)
+    await pipeline_manager.reload_settings_cache(device_id)
 
     return DeviceSettingsResponse.model_validate(settings)

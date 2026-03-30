@@ -6,6 +6,7 @@ import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
 import History from '@/pages/History'
 import DeviceSettings from '@/pages/Settings/DeviceSettings'
+import DeviceManagement from '@/pages/Settings/DeviceManagement'
 import UserManagement from '@/pages/Settings/UserManagement'
 
 const queryClient = new QueryClient({
@@ -36,7 +37,8 @@ export default function App() {
 
               {/* 需要管理员 */}
               <Route element={<AdminRoute />}>
-                <Route path="users" element={<UserManagement />} />
+                <Route path="users"    element={<UserManagement />} />
+                <Route path="devices"  element={<DeviceManagement />} />
               </Route>
             </Route>
           </Route>
