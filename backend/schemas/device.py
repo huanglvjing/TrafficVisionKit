@@ -45,6 +45,14 @@ class DeviceSettingsUpdate(BaseModel):
     alert_l3_threshold: Optional[int] = Field(default=None, ge=1, le=100)
     alert_l4_threshold: Optional[int] = Field(default=None, ge=1, le=100)
     park_timeout_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
+    # 0002 新增
+    calibration_px_per_meter: Optional[float] = Field(default=None, gt=0)
+    speed_limit_kmh: Optional[int] = Field(default=None, ge=10, le=200)
+    allowed_direction: Optional[str] = Field(default=None, pattern=r"^(up|down|both)$")
+    roi_x1: Optional[int] = Field(default=None, ge=0, le=3840)
+    roi_y1: Optional[int] = Field(default=None, ge=0, le=2160)
+    roi_x2: Optional[int] = Field(default=None, ge=0, le=3840)
+    roi_y2: Optional[int] = Field(default=None, ge=0, le=2160)
 
 
 class DeviceSettingsResponse(BaseModel):
@@ -59,6 +67,13 @@ class DeviceSettingsResponse(BaseModel):
     alert_l3_threshold: int
     alert_l4_threshold: int
     park_timeout_seconds: int
+    calibration_px_per_meter: Optional[float]
+    speed_limit_kmh: int
+    allowed_direction: str
+    roi_x1: int
+    roi_y1: int
+    roi_x2: int
+    roi_y2: int
     updated_at: datetime
 
     model_config = {"from_attributes": True}

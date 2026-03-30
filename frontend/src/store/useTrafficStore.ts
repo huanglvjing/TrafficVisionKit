@@ -6,16 +6,24 @@ const DEFAULT_DEVICE_ID =
   Number(import.meta.env['VITE_DEFAULT_DEVICE_ID'] ?? '1') || 1
 
 const MAX_HISTORY_POINTS = 60
-/** 图表最小采样间隔（毫秒）：每秒最多 1 个数据点，避免帧率驱动的刷屏 */
 const CHART_SAMPLE_INTERVAL_MS = 1000
+const TRACK_HISTORY_MAX_FRAMES = 30
+const TRACK_EXPIRE_MS = 3000
 
+// ── 轨迹点 ────────────────────────────────────────────────────────────────────
+export interface TrackPoint {
+  cx: number   // 画布坐标（0.5 缩放后）
+  cy: number
+  ts: number   // Date.now()
+}
+
+// ── Store 接口 ─────────────────────────────────────────────────────────────────
 interface TrafficState {
-  // 当前帧（base64 JPEG）
+  // 视频帧
   currentFrame: string | null
-  // 帧分辨率（来自 stream_frame.frame）
   frameWidth: number
   frameHeight: number
-  // 检测统计
+  // 基础检测统计
   vehicleCount: number
   passedCount: number
   passedInCount: number
@@ -23,21 +31,28 @@ interface TrafficState {
   alertLevel: number
   lineY: number
   inferenceMs: number
-  // 当前帧所有检测到的车辆（供前端 Canvas 绘制 HUD 检测框）
   vehicles: VehicleDetection[]
-  // 活跃预警列表
   activeAlerts: AlertItem[]
-  // 近 60 秒实时车辆数折线图数据（每秒 1 点）
   realtimeHistory: TimeSeriesPoint[]
+  // 0002 新增指标
+  occupancy: number
+  losGrade: string
+  avgSpeedKmh: number | null
+  avgHeadwaySec: number | null
+  queueLength: number
+  wrongWayActive: boolean
+  speedCalibrated: boolean
+  // 实时占道率折线图数据
+  realtimeOccupancyHistory: TimeSeriesPoint[]
+  // 轨迹画布：tracking_id → 最近30帧历史点（画布坐标，0.5缩放）
+  trackHistoryMap: Map<number, TrackPoint[]>
+  // 当前高亮的 tracking_id（画布点击联动视频框）
+  highlightedTrackId: number | null
   // 设备在线状态
   isDeviceOnline: boolean
-  // 当前选中设备 ID
   selectedDeviceId: number
 
-  /**
-   * 同时更新视频帧 + 检测统计，合并为一次 set 调用，
-   * 避免两次独立 set 产生双倍渲染。
-   */
+  // Actions
   updateFrameAndDetection: (
     base64: string,
     width: number,
@@ -51,8 +66,10 @@ interface TrafficState {
   setDeviceOffline: () => void
   resetDeviceState: () => void
   setSelectedDeviceId: (id: number) => void
+  setHighlightedTrackId: (id: number | null) => void
 }
 
+// ── 初始设备状态 ───────────────────────────────────────────────────────────────
 const initialDeviceState = {
   currentFrame: null,
   frameWidth: 640,
@@ -67,27 +84,78 @@ const initialDeviceState = {
   vehicles: [] as VehicleDetection[],
   activeAlerts: [] as AlertItem[],
   realtimeHistory: [] as TimeSeriesPoint[],
+  occupancy: 0,
+  losGrade: 'A',
+  avgSpeedKmh: null,
+  avgHeadwaySec: null,
+  queueLength: 0,
+  wrongWayActive: false,
+  speedCalibrated: false,
+  realtimeOccupancyHistory: [] as TimeSeriesPoint[],
+  trackHistoryMap: new Map<number, TrackPoint[]>(),
+  highlightedTrackId: null,
   isDeviceOnline: false,
 }
 
-/** 上次写入图表的时间戳（模块级，跨渲染复用） */
+// 画布尺寸（与 TrajectoryCanvas 保持一致）
+const CANVAS_W = 320
+const CANVAS_H = 240
+const SRC_W = 640
+const SRC_H = 480
+
+function toCanvasCoords(px: number, py: number): { cx: number; cy: number } {
+  return {
+    cx: (px / SRC_W) * CANVAS_W,
+    cy: (py / SRC_H) * CANVAS_H,
+  }
+}
+
 let _lastChartTs = 0
 
-/** 从 DetectionData 构建检测字段的纯函数（供两个 action 复用） */
 function buildDetectionFields(
   data: DetectionData,
   currentHistory: TimeSeriesPoint[],
+  currentOccHistory: TimeSeriesPoint[],
+  currentTrackMap: Map<number, TrackPoint[]>,
 ): Partial<TrafficState> {
   const nowMs = Date.now()
+
+  // 图表采样（每秒最多1点）
   let realtimeHistory = currentHistory
+  let realtimeOccupancyHistory = currentOccHistory
   if (nowMs - _lastChartTs >= CHART_SAMPLE_INTERVAL_MS) {
     _lastChartTs = nowMs
-    const point: TimeSeriesPoint = {
-      time: new Date(nowMs).toISOString(),
-      value: data.vehicle_count,
-    }
-    realtimeHistory = [...currentHistory, point].slice(-MAX_HISTORY_POINTS)
+    const timeStr = new Date(nowMs).toISOString()
+    realtimeHistory = [
+      ...currentHistory,
+      { time: timeStr, value: data.vehicle_count },
+    ].slice(-MAX_HISTORY_POINTS)
+    realtimeOccupancyHistory = [
+      ...currentOccHistory,
+      { time: timeStr, value: Math.round((data.occupancy ?? 0) * 100) },
+    ].slice(-MAX_HISTORY_POINTS)
   }
+
+  // 更新轨迹历史 Map
+  const newMap = new Map(currentTrackMap)
+  const activeIds = new Set<number>()
+  for (const v of data.vehicles ?? []) {
+    if (v.tracking_id < 0) continue
+    activeIds.add(v.tracking_id)
+    const cx_src = (v.bbox[0] + v.bbox[2]) / 2
+    const cy_src = (v.bbox[1] + v.bbox[3]) / 2
+    const { cx, cy } = toCanvasCoords(cx_src, cy_src)
+    const hist = newMap.get(v.tracking_id) ?? []
+    const updated = [...hist, { cx, cy, ts: nowMs }]
+    newMap.set(v.tracking_id, updated.slice(-TRACK_HISTORY_MAX_FRAMES))
+  }
+  // 清理超时 tracking_id
+  for (const [id, hist] of newMap) {
+    if (!activeIds.has(id) && nowMs - (hist.at(-1)?.ts ?? 0) > TRACK_EXPIRE_MS) {
+      newMap.delete(id)
+    }
+  }
+
   return {
     vehicleCount: data.vehicle_count,
     passedCount: data.passed_count,
@@ -97,7 +165,16 @@ function buildDetectionFields(
     lineY: data.line_y,
     inferenceMs: data.inference_ms,
     vehicles: data.vehicles ?? [],
+    occupancy: data.occupancy ?? 0,
+    losGrade: data.los_grade ?? 'A',
+    avgSpeedKmh: data.avg_speed_kmh ?? null,
+    avgHeadwaySec: data.avg_headway_sec ?? null,
+    queueLength: data.queue_length ?? 0,
+    wrongWayActive: data.wrong_way_active ?? false,
+    speedCalibrated: data.speed_calibrated ?? false,
     realtimeHistory,
+    realtimeOccupancyHistory,
+    trackHistoryMap: newMap,
     isDeviceOnline: true,
   }
 }
@@ -106,13 +183,17 @@ export const useTrafficStore = create<TrafficState>((set) => ({
   ...initialDeviceState,
   selectedDeviceId: DEFAULT_DEVICE_ID,
 
-  /** 帧 + 检测数据一次合并更新，减少 React 渲染次数 */
   updateFrameAndDetection: (base64, width, height, data) =>
     set((s) => ({
       currentFrame: base64,
       frameWidth: width,
       frameHeight: height,
-      ...buildDetectionFields(data, s.realtimeHistory),
+      ...buildDetectionFields(
+        data,
+        s.realtimeHistory,
+        s.realtimeOccupancyHistory,
+        s.trackHistoryMap,
+      ),
     })),
 
   updateFrame: (base64, width, height) =>
@@ -123,7 +204,14 @@ export const useTrafficStore = create<TrafficState>((set) => ({
     })),
 
   updateDetection: (data) =>
-    set((s) => buildDetectionFields(data, s.realtimeHistory)),
+    set((s) =>
+      buildDetectionFields(
+        data,
+        s.realtimeHistory,
+        s.realtimeOccupancyHistory,
+        s.trackHistoryMap,
+      ),
+    ),
 
   addAlert: (alert) =>
     set((state) => {
@@ -137,9 +225,19 @@ export const useTrafficStore = create<TrafficState>((set) => ({
     })),
 
   setDeviceOffline: () =>
-    set({ isDeviceOnline: false, vehicleCount: 0, alertLevel: 0 }),
+    set({
+      isDeviceOnline: false,
+      vehicleCount: 0,
+      alertLevel: 0,
+      occupancy: 0,
+      avgSpeedKmh: null,
+      wrongWayActive: false,
+    }),
 
-  resetDeviceState: () => set(initialDeviceState),
+  resetDeviceState: () =>
+    set({ ...initialDeviceState, trackHistoryMap: new Map() }),
 
   setSelectedDeviceId: (id) => set({ selectedDeviceId: id }),
+
+  setHighlightedTrackId: (id) => set({ highlightedTrackId: id }),
 }))

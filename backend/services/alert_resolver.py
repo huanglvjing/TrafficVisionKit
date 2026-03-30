@@ -166,6 +166,69 @@ class AlertResolver:
         if active_id:
             await self._resolve_alert(active_id, device_id, "device_offline", "auto")
 
+    async def on_speeding(
+        self, device_id: int, tracking_id: int, speed_kmh: float, bbox_snapshot: Optional[str]
+    ) -> None:
+        """超速事件：写 speed_events 表，触发超速预警（防重：同 tracking_id 30s 内只触发一次）。"""
+        from datetime import datetime, timezone
+        now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+        try:
+            from models import SpeedEvent
+            async with AsyncSessionLocal() as session:
+                session.add(SpeedEvent(
+                    device_id=device_id,
+                    tracking_id=tracking_id,
+                    speed_kmh=speed_kmh,
+                    occurred_at=now_dt,
+                    bbox_snapshot=bbox_snapshot,
+                ))
+                await session.commit()
+        except Exception as exc:
+            logger.warning(f"[AlertResolver] speed_event write failed: {exc}")
+
+        alert_type = f"speeding_{tracking_id}"
+        await self._trigger_alert(
+            device_id=device_id,
+            alert_type=alert_type,
+            level=3,
+            message=f"设备 {device_id} 车辆 tracking_id={tracking_id} 超速 {speed_kmh:.1f} km/h",
+            vehicle_count=None,
+        )
+
+    async def on_wrong_way(self, device_id: int, tracking_id: int, vehicle_count: int) -> None:
+        """逆行预警（L4）。"""
+        alert_type = f"wrong_way_{tracking_id}"
+        await self._trigger_alert(
+            device_id=device_id,
+            alert_type=alert_type,
+            level=4,
+            message=f"设备 {device_id} 检测到车辆 tracking_id={tracking_id} 逆行",
+            vehicle_count=vehicle_count,
+        )
+
+    async def on_dense_flow(self, device_id: int, vehicle_count: int) -> None:
+        """密集流预警（L2，车头时距 < 1s）。"""
+        await self._trigger_alert(
+            device_id=device_id,
+            alert_type="dense_flow",
+            level=2,
+            message=f"设备 {device_id} 车头时距不足 1 秒，车流密集",
+            vehicle_count=vehicle_count,
+        )
+
+    async def on_queue_detected(self, device_id: int, queue_len: int, vehicle_count: int) -> None:
+        """排队检测预警（L3）。"""
+        active_id = self._active.get(device_id, {}).get("queue_detected")
+        if active_id:
+            return
+        await self._trigger_alert(
+            device_id=device_id,
+            alert_type="queue_detected",
+            level=3,
+            message=f"设备 {device_id} 检测到排队长度约 {queue_len} 辆",
+            vehicle_count=vehicle_count,
+        )
+
     async def check_flow_spike(
         self, device_id: int, passed_count: int, avg_per_min: float
     ) -> None:

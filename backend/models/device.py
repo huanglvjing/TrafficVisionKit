@@ -5,6 +5,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
+    Enum,
     Float,
     ForeignKey,
     Integer,
@@ -100,6 +101,24 @@ class DeviceSettings(Base):
     park_timeout_seconds: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, server_default="30"
     )
+    # ── 0002 迁移新增字段 ─────────────────────────────────────────────────────
+    # 速度标定系数（像素/米），NULL 表示未标定
+    calibration_px_per_meter: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # 超速阈值（km/h）
+    speed_limit_kmh: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default="60"
+    )
+    # 允许行驶方向（用于逆行检测）
+    allowed_direction: Mapped[str] = mapped_column(
+        Enum("up", "down", "both", name="direction_enum"),
+        nullable=False,
+        server_default="both",
+    )
+    # ROI 矩形坐标（像素空间，默认覆盖全帧）
+    roi_x1: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
+    roi_y1: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
+    roi_x2: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="640")
+    roi_y2: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="480")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )

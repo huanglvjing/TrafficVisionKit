@@ -9,6 +9,8 @@ export interface VehicleDetection {
   confidence: number
   bbox: [number, number, number, number]
   is_parked: boolean
+  is_wrong_way: boolean
+  speed_kmh: number | null
 }
 
 export interface FrameData {
@@ -27,6 +29,15 @@ export interface DetectionData {
   vehicles: VehicleDetection[]
   line_y: number
   inference_ms: number
+  // 0002 新增实时指标
+  occupancy: number
+  los_grade: string
+  avg_speed_kmh: number | null
+  avg_headway_sec: number | null
+  min_headway_sec: number | null
+  queue_length: number
+  wrong_way_active: boolean
+  speed_calibrated: boolean
 }
 
 export interface StreamFrameMsg {

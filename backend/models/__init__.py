@@ -3,7 +3,7 @@
 from models.base import Base
 from models.user import User
 from models.device import Device, DeviceSettings
-from models.traffic import TrafficRecord, HourlyStatistics
+from models.traffic import TrafficRecord, HourlyStatistics, SpeedEvent, TrajectoryHeatmapSnapshot
 from models.alert import TrafficAlert
 from models.session import ConnectionSession
 from models.log import SystemLog
@@ -15,6 +15,8 @@ __all__ = [
     "DeviceSettings",
     "TrafficRecord",
     "HourlyStatistics",
+    "SpeedEvent",
+    "TrajectoryHeatmapSnapshot",
     "TrafficAlert",
     "ConnectionSession",
     "SystemLog",

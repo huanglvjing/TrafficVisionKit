@@ -58,6 +58,13 @@ export interface DeviceSettingsRead {
   alert_l3_threshold: number
   alert_l4_threshold: number
   park_timeout_seconds: number
+  calibration_px_per_meter: number | null
+  speed_limit_kmh: number
+  allowed_direction: 'up' | 'down' | 'both'
+  roi_x1: number
+  roi_y1: number
+  roi_x2: number
+  roi_y2: number
   updated_at: string
 }
 
@@ -69,6 +76,13 @@ export interface DeviceSettingsUpdate {
   alert_l3_threshold?: number
   alert_l4_threshold?: number
   park_timeout_seconds?: number
+  calibration_px_per_meter?: number
+  speed_limit_kmh?: number
+  allowed_direction?: 'up' | 'down' | 'both'
+  roi_x1?: number
+  roi_y1?: number
+  roi_x2?: number
+  roi_y2?: number
 }
 
 // ── 历史数据 ──────────────────────────────────────────────────────────────────
@@ -85,6 +99,15 @@ export interface TrafficRecordItem {
   car_count: number | null
   truck_count: number | null
   bus_count: number | null
+  avg_occupancy: number | null
+  avg_speed_kmh: number | null
+  max_speed_kmh: number | null
+  speed_violation_count: number | null
+  avg_headway_sec: number | null
+  min_headway_sec: number | null
+  queue_length: number | null
+  los_grade: string | null
+  wrong_way_count: number | null
   created_at: string
 }
 
@@ -96,6 +119,11 @@ export interface HourlyStatisticsItem {
   avg_count: number
   peak_count: number
   alert_count: number
+  avg_speed_kmh: number | null
+  avg_occupancy: number | null
+  peak_occupancy: number | null
+  speed_violation_count: number | null
+  wrong_way_count: number | null
   created_at: string
 }
 

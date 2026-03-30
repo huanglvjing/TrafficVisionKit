@@ -16,6 +16,15 @@ class TrafficRecordResponse(BaseModel):
     passed_count: int
     passed_in_count: int
     passed_out_count: int
+    avg_occupancy: Optional[float]
+    avg_speed_kmh: Optional[float]
+    max_speed_kmh: Optional[float]
+    speed_violation_count: Optional[int]
+    avg_headway_sec: Optional[float]
+    min_headway_sec: Optional[float]
+    queue_length: Optional[int]
+    los_grade: Optional[str]
+    wrong_way_count: Optional[int]
 
     model_config = {"from_attributes": True}
 
@@ -30,6 +39,11 @@ class HourlyStatisticsResponse(BaseModel):
     avg_count: int
     peak_count: int
     alert_count: int
+    avg_speed_kmh: Optional[float]
+    avg_occupancy: Optional[float]
+    peak_occupancy: Optional[float]
+    speed_violation_count: Optional[int]
+    wrong_way_count: Optional[int]
 
     model_config = {"from_attributes": True}
 

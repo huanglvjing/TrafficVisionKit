@@ -32,6 +32,16 @@ class _DeviceBuffer:
     vehicle_counts: list[int] = field(default_factory=list)
     passed_in: int = 0
     passed_out: int = 0
+    # 0002 新增
+    occupancy_samples: list[float] = field(default_factory=list)
+    speed_samples: list[float] = field(default_factory=list)
+    max_speed_samples: list[float] = field(default_factory=list)
+    speed_violation_count: int = 0
+    headway_samples: list[float] = field(default_factory=list)
+    min_headway_samples: list[float] = field(default_factory=list)
+    queue_lengths: list[int] = field(default_factory=list)
+    los_grades: list[str] = field(default_factory=list)
+    wrong_way_count: int = 0
 
 
 def _utcnow_naive() -> datetime:
@@ -53,15 +63,35 @@ class Aggregator:
     # ── 外部接口 ────────────────────────────────────────────────────────────────
 
     def add_sample(self, device_id: int, data: dict) -> None:
-        """被 db_write_loop 每帧调用，纯内存操作，不阻塞事件循环。
-
-        data 格式（来自 dispatch_loop）：
-            {vehicle_count, passed_in, passed_out, inference_ms, timestamp}
-        """
+        """被 db_write_loop 每帧调用，纯内存操作，不阻塞事件循环。"""
         buf = self._buffers.setdefault(device_id, _DeviceBuffer())
         buf.vehicle_counts.append(data.get("vehicle_count", 0))
         buf.passed_in += data.get("passed_in", 0)
         buf.passed_out += data.get("passed_out", 0)
+        # 0002 新增指标
+        occ = data.get("occupancy")
+        if occ is not None:
+            buf.occupancy_samples.append(occ)
+        asp = data.get("avg_speed")
+        if asp is not None:
+            buf.speed_samples.append(asp)
+        msp = data.get("max_speed")
+        if msp is not None:
+            buf.max_speed_samples.append(msp)
+        buf.speed_violation_count += data.get("speed_violation_count", 0)
+        ahw = data.get("avg_headway")
+        if ahw is not None:
+            buf.headway_samples.append(ahw)
+        mhw = data.get("min_headway")
+        if mhw is not None:
+            buf.min_headway_samples.append(mhw)
+        ql = data.get("queue_length")
+        if ql is not None:
+            buf.queue_lengths.append(ql)
+        lg = data.get("los_grade")
+        if lg:
+            buf.los_grades.append(lg)
+        buf.wrong_way_count += data.get("wrong_way_count", 0)
 
     def run(self) -> None:
         """启动分钟聚合协程（main.py lifespan 启动时调用）。"""
@@ -147,6 +177,28 @@ class Aggregator:
             passed_out = buf.passed_out
             passed_count = passed_in + passed_out
 
+            # 计算新指标聚合值
+            avg_occ = (
+                sum(buf.occupancy_samples) / len(buf.occupancy_samples)
+                if buf.occupancy_samples else None
+            )
+            avg_spd = (
+                sum(buf.speed_samples) / len(buf.speed_samples)
+                if buf.speed_samples else None
+            )
+            max_spd = max(buf.max_speed_samples) if buf.max_speed_samples else None
+            avg_hw = (
+                sum(buf.headway_samples) / len(buf.headway_samples)
+                if buf.headway_samples else None
+            )
+            min_hw = min(buf.min_headway_samples) if buf.min_headway_samples else None
+            queue_len = max(buf.queue_lengths) if buf.queue_lengths else None
+            # LOS 等级取众数（最频繁出现的等级）
+            los = (
+                max(set(buf.los_grades), key=buf.los_grades.count)
+                if buf.los_grades else None
+            )
+
             try:
                 async with AsyncSessionLocal() as session:
                     session.add(
@@ -158,6 +210,15 @@ class Aggregator:
                             passed_count=passed_count,
                             passed_in_count=passed_in,
                             passed_out_count=passed_out,
+                            avg_occupancy=avg_occ,
+                            avg_speed_kmh=avg_spd,
+                            max_speed_kmh=max_spd,
+                            speed_violation_count=buf.speed_violation_count or None,
+                            avg_headway_sec=avg_hw,
+                            min_headway_sec=min_hw,
+                            queue_length=queue_len,
+                            los_grade=los,
+                            wrong_way_count=buf.wrong_way_count or None,
                         )
                     )
                     await session.commit()
@@ -251,13 +312,18 @@ class Aggregator:
 
         try:
             async with AsyncSessionLocal() as session:
-                # 按设备聚合 traffic_records
+                # 按设备聚合 traffic_records（含新指标字段）
                 agg_result = await session.execute(
                     select(
                         TrafficRecord.device_id,
                         func.sum(TrafficRecord.passed_count).label("total_passed"),
                         func.avg(TrafficRecord.avg_count).label("avg_count"),
                         func.max(TrafficRecord.max_count).label("peak_count"),
+                        func.avg(TrafficRecord.avg_speed_kmh).label("avg_speed_kmh"),
+                        func.avg(TrafficRecord.avg_occupancy).label("avg_occupancy"),
+                        func.max(TrafficRecord.avg_occupancy).label("peak_occupancy"),
+                        func.sum(TrafficRecord.speed_violation_count).label("speed_violation_count"),
+                        func.sum(TrafficRecord.wrong_way_count).label("wrong_way_count"),
                     )
                     .where(
                         and_(
@@ -278,6 +344,11 @@ class Aggregator:
                 total_passed = int(row.total_passed or 0)
                 avg_count = int(round(float(row.avg_count or 0)))
                 peak_count = int(row.peak_count or 0)
+                h_avg_speed = float(row.avg_speed_kmh) if row.avg_speed_kmh is not None else None
+                h_avg_occ = float(row.avg_occupancy) if row.avg_occupancy is not None else None
+                h_peak_occ = float(row.peak_occupancy) if row.peak_occupancy is not None else None
+                h_spd_vio = int(row.speed_violation_count or 0) or None
+                h_wrong = int(row.wrong_way_count or 0) or None
 
                 # 统计该小时内触发的预警次数
                 try:
@@ -310,12 +381,22 @@ class Aggregator:
                             avg_count=avg_count,
                             peak_count=peak_count,
                             alert_count=alert_count,
+                            avg_speed_kmh=h_avg_speed,
+                            avg_occupancy=h_avg_occ,
+                            peak_occupancy=h_peak_occ,
+                            speed_violation_count=h_spd_vio,
+                            wrong_way_count=h_wrong,
                         )
                         stmt = stmt.on_duplicate_key_update(
                             total_passed=stmt.inserted.total_passed,
                             avg_count=stmt.inserted.avg_count,
                             peak_count=stmt.inserted.peak_count,
                             alert_count=stmt.inserted.alert_count,
+                            avg_speed_kmh=stmt.inserted.avg_speed_kmh,
+                            avg_occupancy=stmt.inserted.avg_occupancy,
+                            peak_occupancy=stmt.inserted.peak_occupancy,
+                            speed_violation_count=stmt.inserted.speed_violation_count,
+                            wrong_way_count=stmt.inserted.wrong_way_count,
                         )
                         await session.execute(stmt)
                         await session.commit()

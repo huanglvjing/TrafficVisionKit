@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -76,6 +77,39 @@ class DevicePipelineContext:
     # 本次 TCP 连接内累计过线计数
     passed_in_count: int = 0
     passed_out_count: int = 0
+
+    # ── 0002 新增：实时指标追踪状态 ──────────────────────────────────────────
+    # 速度历史：{tracking_id: deque[(cx, cy, ts), ...]}（最近5帧）
+    speed_history: dict = field(default_factory=dict)
+
+    # 方向历史：{tracking_id: deque[dy, ...]}（用于逆行检测）
+    direction_history: dict = field(default_factory=dict)
+
+    # 车头时距状态：{"last_ts": float|None, "recent": deque[float]}
+    headway_state: dict = field(
+        default_factory=lambda: {"last_ts": None, "recent": deque(maxlen=10)}
+    )
+
+    # 本分钟内的逐帧占道率样本（供聚合时计算均值）
+    occupancy_samples: list = field(default_factory=list)
+
+    # 本分钟内的逐帧速度样本（km/h，仅已标定设备有值）
+    speed_samples: list = field(default_factory=list)
+
+    # 本分钟内的超速事件计数
+    speed_violation_count: int = 0
+
+    # 本分钟内的逐帧最高速度样本
+    max_speed_samples: list = field(default_factory=list)
+
+    # 本分钟内的逆行检测次数
+    wrong_way_count: int = 0
+
+    # 轨迹热力图：64×48 密度矩阵（int 计数），每10分钟快照一次后重置
+    heatmap_grid: list = field(
+        default_factory=lambda: [[0] * 48 for _ in range(64)]
+    )
+    heatmap_sample_count: int = 0
 
     # TCP 连接建立时间（用于 connection_session 记录）
     connected_at: float = field(default_factory=time.monotonic)
