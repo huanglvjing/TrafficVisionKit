@@ -15,6 +15,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/useAuthStore'
 import { HudCorners } from '@/components/video/HudCorners'
+import { LoginCharacter } from '@/components/LoginCharacter'
+import TrafficLoading from '@/components/TrafficLoading'
 
 // ── 错误工具 ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +65,9 @@ function ParticleCanvas() {
     const COLS = 28
     const ROWS = 18
 
+    let mouseX = -1000
+    let mouseY = -1000
+
     const draw = () => {
       t += 0.008
       ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -72,14 +77,29 @@ function ParticleCanvas() {
 
       for (let col = 0; col <= COLS; col++) {
         for (let row = 0; row <= ROWS; row++) {
-          const x = col * cw
-          const y = row * ch
+          let x = col * cw
+          let y = row * ch
+          
+          // Mouse interaction
+          const dx = mouseX - x
+          const dy = mouseY - y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          const maxDist = 150
+          
+          let mouseAlpha = 0
+          if (dist < maxDist) {
+            const force = (maxDist - dist) / maxDist
+            mouseAlpha = force * 0.15
+            x -= dx * force * 0.1 // Push points slightly away from mouse
+            y -= dy * force * 0.1
+          }
+
           const wave = Math.sin(col * 0.4 + t) * Math.cos(row * 0.35 + t * 0.7)
-          const alpha = (wave + 1) * 0.025 + 0.02
+          const alpha = (wave + 1) * 0.025 + 0.02 + mouseAlpha
 
           ctx.fillStyle = `rgba(0,212,255,${alpha.toFixed(3)})`
           ctx.beginPath()
-          ctx.arc(x, y, 1, 0, Math.PI * 2)
+          ctx.arc(x, y, dist < maxDist ? 1.5 : 1, 0, Math.PI * 2)
           ctx.fill()
         }
       }
@@ -111,8 +131,15 @@ function ParticleCanvas() {
     }
     draw()
 
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseX = e.clientX
+      mouseY = e.clientY
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+
     return () => {
       window.removeEventListener('resize', resize)
+      window.removeEventListener('mousemove', handleMouseMove)
       cancelAnimationFrame(raf)
     }
   }, [])
@@ -207,8 +234,12 @@ export default function Login() {
 
   const [username, setUsername]     = useState('')
   const [password, setPassword]     = useState('')
+  const [isUsernameFocused, setIsUsernameFocused] = useState(false)
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false)
   const [loading, setLoading]       = useState(false)
   const [initDone, setInitDone]     = useState(false)
+  const [showTrafficLoading, setShowTrafficLoading] = useState(false)
+  const [trafficSuccess, setTrafficSuccess] = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [lockMinutes, setLockMinutes] = useState<number | null>(null)
   const [clock, setClock]           = useState('')
@@ -239,9 +270,9 @@ export default function Login() {
   }, [])
 
   useEffect(() => {
-    if (isAuthenticated && initDone) navigate(from, { replace: true })
+    if (isAuthenticated && initDone && !showTrafficLoading) navigate(from, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+  }, [isAuthenticated, initDone, showTrafficLoading])
 
   useEffect(() => {
     if (initDone) usernameRef.current?.focus()
@@ -256,9 +287,17 @@ export default function Login() {
       return
     }
     setLoading(true)
+    setShowTrafficLoading(true)
+    setTrafficSuccess(false)
     try {
-      await login(username.trim(), password)
+      // 人为增加一点假延迟，让用户能看清楚红灯和认证中的状态
+      const loginPromise = login(username.trim(), password)
+      const delayPromise = new Promise(resolve => setTimeout(resolve, 1500))
+      await Promise.all([loginPromise, delayPromise])
+      
+      setTrafficSuccess(true)
     } catch (err) {
+      setShowTrafficLoading(false)
       const status = getErrorStatus(err)
       const data   = getErrorData(err)
       if (status === 423) {
@@ -301,10 +340,26 @@ export default function Login() {
   }
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-bg-base">
+    <>
+      {showTrafficLoading && (
+        <TrafficLoading 
+          isSuccess={trafficSuccess} 
+          onComplete={() => navigate(from, { replace: true })} 
+        />
+      )}
+      <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-bg-base">
 
       {/* 动态粒子网格 */}
       <ParticleCanvas />
+
+      {/* 扫描线遮罩 */}
+      <div 
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.015]"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, #00D4FF 2px, #00D4FF 4px)',
+          backgroundSize: '100% 4px'
+        }}
+      />
 
       {/* 雷达扫描环 */}
       <RadarRings />
@@ -326,11 +381,78 @@ export default function Login() {
 
       {/* 主内容 */}
       <motion.div
-        className="relative z-10 flex flex-col items-center"
+        className="relative z-10 flex w-full max-w-7xl flex-col items-center justify-center px-4"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
       >
+        {/* 左右装饰性 HUD 侧边栏 (大屏显示) */}
+        <div className="pointer-events-none absolute left-0 top-1/2 hidden -translate-y-1/2 flex-col gap-12 xl:flex">
+          <div className="flex flex-col gap-2 opacity-40">
+            <div className="font-mono text-[10px] tracking-[0.2em] text-accent uppercase">SYS_DIAGNOSTICS</div>
+            {[0.8, 0.4, 0.9, 0.6, 0.3].map((val, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-4 text-right font-mono text-[8px] text-accent">{`0${i + 1}`}</div>
+                <div className="h-1 w-24 bg-accent/20">
+                  <motion.div 
+                    className="h-full bg-accent" 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${val * 100}%` }}
+                    transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut', delay: i * 0.2 }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-2 opacity-40">
+            <div className="font-mono text-[10px] tracking-[0.2em] text-accent uppercase">DATA_STREAM</div>
+            <div className="flex flex-col gap-1 font-mono text-[8px] text-accent">
+              {[...Array(6)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
+                >
+                  {`0x${Math.floor(Math.random() * 16777215).toString(16).toUpperCase().padStart(6, '0')} ... OK`}
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 flex-col items-end gap-12 xl:flex">
+          <div className="flex flex-col items-end gap-2 opacity-40">
+            <div className="font-mono text-[10px] tracking-[0.2em] text-accent uppercase">NETWORK_UPLINK</div>
+            <div className="flex items-end gap-1 h-12">
+              {[...Array(12)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="w-1.5 bg-accent"
+                  animate={{ height: ['20%', '100%', '20%'] }}
+                  transition={{ duration: 1 + Math.random(), repeat: Infinity, ease: 'easeInOut' }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2 opacity-40">
+            <div className="font-mono text-[10px] tracking-[0.2em] text-accent uppercase">SECURITY_PROTOCOL</div>
+            <div className="relative h-16 w-16">
+              <motion.div 
+                className="absolute inset-0 rounded-full border border-accent border-t-transparent"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+              />
+              <motion.div 
+                className="absolute inset-2 rounded-full border border-accent border-b-transparent opacity-50"
+                animate={{ rotate: -360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center font-mono text-[8px] text-accent">
+                ACTIVE
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* 系统标题 */}
         <div className="mb-10 text-center">
@@ -386,16 +508,32 @@ export default function Login() {
           </motion.p>
         </div>
 
-        {/* 登录卡片 */}
-        <motion.div
-          className="relative w-[340px]"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-        >
+        {/* 登录区域：左侧角色 + 右侧卡片 */}
+        <div className="flex w-full max-w-4xl flex-col md:flex-row items-center justify-center gap-8 md:gap-24">
+          {/* 左侧角色 */}
+          <motion.div
+            className="hidden md:flex h-[320px] w-[320px] items-center justify-center"
+            initial={{ opacity: 0, x: -40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.6, ease: 'easeOut' }}
+          >
+            <LoginCharacter
+              isPasswordFocused={isPasswordFocused}
+              isUsernameFocused={isUsernameFocused}
+              usernameLength={username.length}
+            />
+          </motion.div>
+
+          {/* 登录卡片 */}
+          <motion.div
+            className="relative w-full max-w-[380px]"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+          >
           {/* 卡片背景 */}
           <div
-            className="rounded-sm p-8"
+            className="rounded-sm p-8 relative overflow-hidden"
             style={{
               background: 'rgba(15,22,40,0.92)',
               border: '1px solid rgba(0,212,255,0.2)',
@@ -404,10 +542,19 @@ export default function Login() {
               backdropFilter: 'blur(12px)',
             }}
           >
+            {/* Grid overlay */}
+            <div 
+              className="pointer-events-none absolute inset-0 opacity-[0.03]"
+              style={{
+                backgroundImage: 'linear-gradient(rgba(0,212,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,1) 1px, transparent 1px)',
+                backgroundSize: '20px 20px'
+              }}
+            />
+            
             <HudCorners color="#00D4FF" length={14} thickness={1.5} pulse />
 
             {/* 标题 */}
-            <div className="mb-7 flex items-center gap-3">
+            <div className="relative z-10 mb-7 flex items-center gap-3">
               <span
                 className="block h-[5px] w-[5px] rounded-full bg-accent"
                 style={{ boxShadow: '0 0 6px #00D4FF' }}
@@ -417,7 +564,7 @@ export default function Login() {
               </span>
             </div>
 
-            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+            <form onSubmit={handleSubmit} noValidate className="relative z-10 flex flex-col gap-5">
               {/* 用户名 */}
               <div className="flex flex-col gap-2">
                 <label className="font-display text-[9px] tracking-[0.2em] text-text-secondary/60 uppercase">
@@ -445,10 +592,12 @@ export default function Login() {
                       boxShadow: 'inset 0 0 0 0 transparent',
                     }}
                     onFocus={(e) => {
+                      setIsUsernameFocused(true)
                       e.target.style.border = '1px solid rgba(0,212,255,0.5)'
                       e.target.style.boxShadow = '0 0 12px rgba(0,212,255,0.15), inset 0 0 8px rgba(0,212,255,0.05)'
                     }}
                     onBlur={(e) => {
+                      setIsUsernameFocused(false)
                       e.target.style.border = '1px solid rgba(0,212,255,0.15)'
                       e.target.style.boxShadow = 'none'
                     }}
@@ -478,10 +627,12 @@ export default function Login() {
                   "
                   style={{ border: '1px solid rgba(0,212,255,0.15)' }}
                   onFocus={(e) => {
+                    setIsPasswordFocused(true)
                     e.target.style.border = '1px solid rgba(0,212,255,0.5)'
                     e.target.style.boxShadow = '0 0 12px rgba(0,212,255,0.15), inset 0 0 8px rgba(0,212,255,0.05)'
                   }}
                   onBlur={(e) => {
+                    setIsPasswordFocused(false)
                     e.target.style.border = '1px solid rgba(0,212,255,0.15)'
                     e.target.style.boxShadow = 'none'
                   }}
@@ -545,6 +696,7 @@ export default function Login() {
             </form>
           </div>
         </motion.div>
+        </div>
 
         {/* 底部系统版本 */}
         <motion.div
@@ -561,5 +713,6 @@ export default function Login() {
         </motion.div>
       </motion.div>
     </div>
+    </>
   )
 }
