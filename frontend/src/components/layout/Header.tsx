@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { useTrafficStore } from '@/store/useTrafficStore'
 import { useAuth } from '@/hooks/useAuth'
 import { useDevices } from '@/lib/api'
+import { CopyrightAttribution } from './CopyrightAttribution'
 
 export function Header() {
   const user = useAuthStore((s) => s.user)
@@ -89,6 +90,10 @@ export function Header() {
             </ul>
           </>
         )}
+      </div>
+
+      <div className="hidden md:block">
+        <CopyrightAttribution className="text-text-secondary/35" />
       </div>
 
       {/* 弹性间距 */}

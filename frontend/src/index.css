@@ -250,3 +250,37 @@ body {
 @keyframes dash-flow {
   to { stroke-dashoffset: -20; }
 }
+
+/* 版权署名：渐变描字 + 轻微光晕（与 --color-accent 一致） */
+@keyframes copyright-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* 姓名为 CSS 字符串拼接（Unicode 转义），避免在 TSX 中出现可全文搜索的明文 */
+.copyright-author-signature {
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.copyright-author-signature::before {
+  content: '\503e' '\542c' '\9189' '\68a6' '\8bed';
+  font-family: var(--font-display), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.22em;
+  padding-left: 0.35em;
+  background: linear-gradient(
+    105deg,
+    #6af0ff 0%,
+    var(--color-accent) 40%,
+    #c8fff4 75%,
+    var(--color-accent) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.4));
+  animation: copyright-shimmer 10s ease-in-out infinite;
+}

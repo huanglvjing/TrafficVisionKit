@@ -17,6 +17,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { HudCorners } from '@/components/video/HudCorners'
 import { LoginCharacter } from '@/components/LoginCharacter'
 import TrafficLoading from '@/components/TrafficLoading'
+import { CopyrightAttribution } from '@/components/layout/CopyrightAttribution'
 
 // ── 错误工具 ──────────────────────────────────────────────────────────────────
 
@@ -553,8 +554,9 @@ export default function Login() {
             
             <HudCorners color="#00D4FF" length={14} thickness={1.5} pulse />
 
-            {/* 标题 */}
-            <div className="relative z-10 mb-7 flex items-center gap-3">
+            {/* 标题 + 版权署名 */}
+            <div className="relative z-10 mb-7 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+              <div className="flex items-center gap-3">
               <span
                 className="block h-[5px] w-[5px] rounded-full bg-accent"
                 style={{ boxShadow: '0 0 6px #00D4FF' }}
@@ -562,6 +564,8 @@ export default function Login() {
               <span className="font-display text-[10px] font-bold tracking-[0.25em] text-accent uppercase">
                 系统登录 / ACCESS
               </span>
+              </div>
+              <CopyrightAttribution className="text-text-secondary/35" />
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="relative z-10 flex flex-col gap-5">
@@ -698,18 +702,21 @@ export default function Login() {
         </motion.div>
         </div>
 
-        {/* 底部系统版本 */}
+        {/* 底部系统版本 + 著作权署名 */}
         <motion.div
-          className="mt-6 flex items-center gap-4"
+          className="mt-6 flex flex-col items-center gap-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
         >
-          <span className="h-px w-8 bg-text-secondary/15" />
-          <span className="font-mono text-[9px] tracking-[0.3em] text-text-secondary/25 uppercase">
-            v0.5.0 · CHELLJC · {new Date().getFullYear()}
-          </span>
-          <span className="h-px w-8 bg-text-secondary/15" />
+          <div className="flex items-center gap-4">
+            <span className="h-px w-8 bg-text-secondary/15" />
+            <span className="font-mono text-[9px] tracking-[0.3em] text-text-secondary/25 uppercase">
+              v0.5.0 · CHELLJC · 车辆检测计数系统
+            </span>
+            <span className="h-px w-8 bg-text-secondary/15" />
+          </div>
+          <CopyrightAttribution className="justify-center text-text-secondary/45" />
         </motion.div>
       </motion.div>
     </div>
