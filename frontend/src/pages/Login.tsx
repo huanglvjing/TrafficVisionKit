@@ -231,7 +231,7 @@ export default function Login() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/'
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard'
 
   const [username, setUsername]     = useState('')
   const [password, setPassword]     = useState('')

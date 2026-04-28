@@ -18,11 +18,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/',        icon: Activity,  label: '实时监控' },
-  { to: '/history', icon: BarChart2, label: '历史数据' },
-  { to: '/settings',icon: Settings,  label: '系统设置' },
-  { to: '/devices', icon: Monitor,   label: '设备管理', adminOnly: true },
-  { to: '/users',   icon: Users,     label: '用户管理', adminOnly: true },
+  { to: '/dashboard', icon: Activity,  label: '实时监控' },
+  { to: '/history',   icon: BarChart2, label: '历史数据' },
+  { to: '/settings',  icon: Settings,  label: '系统设置' },
+  { to: '/devices',   icon: Monitor,   label: '设备管理', adminOnly: true },
+  { to: '/users',     icon: Users,     label: '用户管理', adminOnly: true },
 ]
 
 export function Sidebar() {
@@ -72,7 +72,7 @@ export function Sidebar() {
           <NavLink
             key={to}
             to={to}
-            end={to === '/'}
+            end={to === '/dashboard'}
             title={label}
             className="group relative"
           >

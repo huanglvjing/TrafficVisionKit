@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ProtectedRoute, AdminRoute } from '@/routes/index'
+import Landing from '@/pages/Landing'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
 import History from '@/pages/History'
@@ -26,19 +27,20 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* 公开路由 */}
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
 
           {/* 需要登录 */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="history" element={<History />} />
-              <Route path="settings" element={<DeviceSettings />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/settings" element={<DeviceSettings />} />
 
               {/* 需要管理员 */}
               <Route element={<AdminRoute />}>
-                <Route path="users"    element={<UserManagement />} />
-                <Route path="devices"  element={<DeviceManagement />} />
+                <Route path="/users"    element={<UserManagement />} />
+                <Route path="/devices"  element={<DeviceManagement />} />
               </Route>
             </Route>
           </Route>

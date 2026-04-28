@@ -24,7 +24,7 @@ export function AdminRoute() {
   const user = useAuthStore((s) => s.user)
 
   if (user?.role !== 'admin') {
-    return <Navigate to="/" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   return <Outlet />
